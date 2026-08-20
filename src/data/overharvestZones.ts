@@ -18,4 +18,48 @@
 
 import type { OverharvestZone } from "@/lib/types";
 
-export const OVERHARVEST_ZONES: OverharvestZone[] = [];
+export const OVERHARVEST_ZONES: OverharvestZone[] = [
+  {
+    id: "a1111111-1111-1111-1111-111111111111",
+    region: "Chamoli Alpine Belt, Uttarakhand",
+    lat: 30.4124,
+    lon: 79.3242,
+    depletion_score: 78.5,
+  },
+  {
+    id: "a2222222-2222-2222-2222-222222222222",
+    region: "Satpura Forest Reserve, Madhya Pradesh",
+    lat: 22.45,
+    lon: 78.4333,
+    depletion_score: 42.0,
+  },
+  {
+    id: "a3333333-3333-3333-3333-333333333333",
+    region: "Nilgiri Biosphere, Tamil Nadu",
+    lat: 11.4102,
+    lon: 76.695,
+    depletion_score: 18.25,
+  },
+  {
+    id: "a4444444-4444-4444-4444-444444444444",
+    region: "Sehore Herbal Corridor, Madhya Pradesh",
+    lat: 23.2031,
+    lon: 77.0844,
+    depletion_score: 64.0,
+  },
+  {
+    id: "a5555555-5555-5555-5555-555555555555",
+    region: "Wayanad Western Ghats, Kerala",
+    lat: 11.6854,
+    lon: 76.132,
+    depletion_score: 88.0,
+  },
+  {
+    id: "a6666666-6666-6666-6666-666666666666",
+    region: "Aravali Foothills, Rajasthan",
+    lat: 24.5854,
+    lon: 73.7125,
+    depletion_score: 31.5,
+  },
+];
+
