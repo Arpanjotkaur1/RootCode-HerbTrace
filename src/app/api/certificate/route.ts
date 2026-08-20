@@ -22,10 +22,22 @@ import {
   StyleSheet,
   Image,
 } from "@react-pdf/renderer";
+import type { DocumentProps } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { getServiceSupabase } from "@/lib/supabase";
 import { CERTIFICATE_FIELDS, disclaimerText } from "@/data/certificateTemplate";
 import type { CertificateData } from "@/lib/types";
+
+// pdf().toBuffer() is misleadingly named -- it actually resolves to a Node
+// ReadableStream, not a Buffer. Collect it into a real Buffer before handing
+// it to NextResponse, which expects a BodyInit (a Node stream isn't one).
+async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
 
 export const dynamic = "force-dynamic";
 
@@ -527,14 +539,20 @@ export async function GET(request: NextRequest) {
     });
 
     // 4. Render PDF buffer
-    const pdfBuffer = await pdf(
+    // CertificateDocument is a wrapper component, not a literal <Document>
+    // element -- pdf()'s types require the latter, but its renderer resolves
+    // function components in the tree fine, so this cast is safe.
+    const pdfStream = await pdf(
       React.createElement(CertificateDocument, {
         data: certificateData,
         qrDataUrl,
-      })
+      }) as unknown as React.ReactElement<DocumentProps>
     ).toBuffer();
+    const pdfBuffer = await streamToBuffer(pdfStream);
 
-    return new NextResponse(pdfBuffer, {
+    // Buffer isn't assignable to BodyInit under this project's lib config;
+    // Uint8Array is unambiguous.
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         ...CORS_HEADERS,
