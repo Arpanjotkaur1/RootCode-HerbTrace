@@ -14,6 +14,9 @@ create table if not exists harvesters (
 
 -- One row per harvested batch. hash/prev_hash form the tamper-evident chain:
 -- hash = SHA256(canonical_batch_data + prev_hash). See src/lib/hashChain.ts.
+-- quantity_kg was added directly on the live table (not through this file) --
+-- included here so schema.sql matches reality; POST /api/batches doesn't
+-- currently set it, it just takes the column default.
 create table if not exists batches (
   id uuid primary key default gen_random_uuid(),
   species_claimed text not null,
@@ -31,7 +34,8 @@ create table if not exists batches (
   hash text not null unique,
   payment_status text not null default 'pending' check (payment_status in ('pending', 'released')),
   payment_amount numeric(12, 2),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  quantity_kg numeric(10, 2) not null default 0
 );
 
 create index if not exists batches_harvester_id_idx on batches (harvester_id);
