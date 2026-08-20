@@ -4,20 +4,24 @@ Verifiable, tamper-evident chain of custody for Ayurvedic herbs, from harvest
 to consumer. Built for Smart India Hackathon internal screening.
 
 This repo is a **pure API backend** — a Supabase-backed Next.js app with no
-UI pages at all, only `src/app/api/**` routes. All UI (harvester capture,
-consumer/exporter provenance page, Arpan's collection-center QC queue and
-admin dashboard, the client-side species classifier) lives in separate
-frontend repos that integrate with this backend over `fetch` against the
-deployed API routes.
+UI pages at all, only `src/app/api/**` routes (plus `src/lib/species-classifier.ts`,
+a browser-only ML utility that lives here as the canonical source even
+though nothing in this repo imports it — see below). All actual UI
+(harvester capture, consumer/exporter provenance page, Arpan's
+collection-center QC queue and admin dashboard) lives in separate frontend
+repos that integrate with this backend over `fetch` against the deployed
+API routes.
 
 ## Team (internal reference only — do not surface this breakdown in any user-facing UI copy)
 
 - **Khushi** — architecture, Supabase schema, hash-chain ledger, AI
   species-verification integration, cross-module data flow, final
   integration, deploy reliability.
-- **Saanvi** — separate repo: harvester capture UI (incl. the client-side
-  species classifier), consumer/QR provenance page, design system.
-  Integrates via the deployed API base URL.
+- **Saanvi** — separate repo: harvester capture UI, consumer/QR provenance
+  page, design system. Needs her own copy of `species-classifier.ts` from
+  this repo (it's browser-only code, has to physically exist in her app to
+  run) plus the trained model files once they exist. Integrates via the
+  deployed API base URL.
 - **Mansi** — certificate template/field mapping, compliance-oriented data
   mapping, demo herb/species metadata, research/demo data.
 - **Arpan** — separate repo: collection-center QC queue UI, admin dashboard
@@ -28,7 +32,7 @@ deployed API routes.
 ## Running locally
 
 ```bash
-npm install
+npm install --legacy-peer-deps   # required: @teachablemachine/image declares an outdated tfjs peer dep
 cp .env.example .env.local   # fill in Supabase values, see below
 npm run dev
 ```
@@ -44,7 +48,8 @@ manual actions below.
 
 ```
 src/
-  lib/            — shared utilities: types, Supabase client, hash chain
+  lib/            — shared utilities: types, Supabase client, hash chain,
+                    species classifier (browser-only, unused within this repo)
   supabase/       — schema.sql (run first) and seed.sql (demo data)
   data/           — demo herb metadata, certificate field mapping, overharvest sample data
   app/
@@ -105,10 +110,12 @@ non-credentialed data. Apply the same pattern when building `api/qc`,
    `harvest-photos` (Saanvi's repo uploads harvest photos directly here —
    see "Locked API contract" above).
 2. **Train/export the species classifier** — via Teachable Machine (browser
-   tool). The classifier code and the harvester capture screen that uses it
-   live entirely in Saanvi's separate repo now, so the exported TF.js files
-   (`model.json`, `metadata.json`, `weights.bin`) go in her repo's
-   `public/models/`. This repo has no `public/models/` at all anymore.
+   tool). Classifier code lives here (`src/lib/species-classifier.ts`) as
+   the canonical source, but the exported TF.js files (`model.json`,
+   `metadata.json`, `weights.bin`) need to go wherever the classifier
+   actually runs -- Saanvi's repo, since it's client-side code loaded by the
+   harvester capture screen. This repo has no `public/models/` to put them
+   in either. See step-by-step in the classifier's file header comment.
 3. **Source real demo herb photos** — copyright-safe images per species,
    handed to Mansi (for `demoHerbs.ts` reference data) and Saanvi (for the
    classifier's training set in her repo). This repo has no `public/images/`
