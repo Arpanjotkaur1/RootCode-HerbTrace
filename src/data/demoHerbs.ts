@@ -17,8 +17,11 @@
 //    non-medicinal species to demo mismatch detection).
 // 2. Fill in real common_name/scientific_name/description for each.
 // 3. Source copyright-safe demo photos per species (own photos or public
-//    domain/government sources) into public/images/herbs/<species-slug>/.
-// 4. These photos can double as Teachable Machine training images.
+//    domain/government sources). This repo has no public/images/ folder --
+//    image_paths below should point wherever the images actually end up
+//    hosted (e.g. a Supabase Storage URL), not a local path in this repo.
+// 4. These same photos can double as Teachable Machine training images in
+//    Saanvi's repo, which owns the classifier now.
 
 export type DemoHerb = {
   slug: string;

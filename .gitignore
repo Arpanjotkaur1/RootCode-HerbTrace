@@ -20,8 +20,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# NOTE: public/models (trained classifier files) is intentionally NOT ignored here.
-# Those files can get large (multi-MB). Khushi: decide whether to commit them so
-# teammates can pull the trained model directly, or gitignore them and share via
-# another channel (Drive/Discord) instead. See root README.md for the flag.

@@ -48,7 +48,7 @@ src/
   supabase/       — schema.sql (run first) and seed.sql (demo data)
   data/           — demo herb metadata, certificate field mapping, overharvest sample data
   app/
-    api/          — batches, qc, qr, certificate, species-classify, overharvest-zones routes
+    api/          — batches, qc, qr, certificate, overharvest-zones routes
 ```
 
 No `src/app` pages exist — this is an API-only Next.js app (`layout.tsx`,
@@ -106,14 +106,15 @@ non-credentialed data. Apply the same pattern when building `api/qc`,
    see "Locked API contract" above).
 2. **Train/export the species classifier** — via Teachable Machine (browser
    tool). The classifier code and the harvester capture screen that uses it
-   now live in Saanvi's separate repo, so the exported TF.js files
-   (`model.json`, `metadata.json`, `weights.bin`) belong in her repo's
-   `public/models/`, not this one's. This repo's own `public/models/` and
-   `public/images/` folders are likely dead weight now — flagged as a
-   cleanup candidate, not deleted yet.
+   live entirely in Saanvi's separate repo now, so the exported TF.js files
+   (`model.json`, `metadata.json`, `weights.bin`) go in her repo's
+   `public/models/`. This repo has no `public/models/` at all anymore.
 3. **Source real demo herb photos** — copyright-safe images per species,
-   handed to Mansi and Saanvi (for `demoHerbs.ts` here and the classifier
-   training set in her repo respectively).
+   handed to Mansi (for `demoHerbs.ts` reference data) and Saanvi (for the
+   classifier's training set in her repo). This repo has no `public/images/`
+   to put them in — Mansi's `image_paths` field in `demoHerbs.ts` should
+   point wherever the images actually end up hosted (e.g. Supabase Storage),
+   not a local path in this repo.
 4. **Deployment** — connect this repo to Vercel (or similar) yourself once
    the build passes locally. Hand the deployed URL to Saanvi and Arpan for
    their API base URL env vars.
