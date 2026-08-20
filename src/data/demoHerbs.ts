@@ -4,8 +4,10 @@
 // classifier's class list, Saanvi's species picker (her separate repo), and
 // the certificate template.
 //
-// Depends on: DEMO_SPECIES_CLASSES in src/lib/species-classifier.ts (Khushi)
-// -- the species list here must match exactly.
+// Depends on: DEMO_SPECIES_CLASSES, the classifier's class list -- now
+// defined in Saanvi's separate frontend repo (the classifier moved there
+// along with the harvester capture screen). The species list here must
+// match hers exactly; confirm the list with her/Khushi.
 //
 // Must output/return: DEMO_HERBS, an array with common_name, scientific_name,
 // a short description, and image paths per species.

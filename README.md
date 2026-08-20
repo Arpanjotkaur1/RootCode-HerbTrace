@@ -3,28 +3,32 @@
 Verifiable, tamper-evident chain of custody for Ayurvedic herbs, from harvest
 to consumer. Built for Smart India Hackathon internal screening.
 
-This repo is the **backend + internal dashboards** (Supabase-backed Next.js
-app: collection-center QC queue, admin dashboard, and the API routes
-everything talks to). The harvester capture flow and the consumer/exporter
-provenance page live in a **separate frontend repo** owned by Saanvi, which
-integrates with this backend over `fetch` against the deployed API routes.
+This repo is a **pure API backend** — a Supabase-backed Next.js app with no
+UI pages at all, only `src/app/api/**` routes. All UI (harvester capture,
+consumer/exporter provenance page, Arpan's collection-center QC queue and
+admin dashboard, the client-side species classifier) lives in separate
+frontend repos that integrate with this backend over `fetch` against the
+deployed API routes.
 
 ## Team (internal reference only — do not surface this breakdown in any user-facing UI copy)
 
 - **Khushi** — architecture, Supabase schema, hash-chain ledger, AI
   species-verification integration, cross-module data flow, final
   integration, deploy reliability.
-- **Saanvi** — separate repo: harvester capture UI, consumer/QR provenance
-  page, design system. Integrates via the deployed API base URL.
+- **Saanvi** — separate repo: harvester capture UI (incl. the client-side
+  species classifier), consumer/QR provenance page, design system.
+  Integrates via the deployed API base URL.
 - **Mansi** — certificate template/field mapping, compliance-oriented data
   mapping, demo herb/species metadata, research/demo data.
-- **Arpan** — collection-center QC queue, payment release logic, harvester
-  wallet simulation, QR generation trigger, admin dashboard.
+- **Arpan** — separate repo: collection-center QC queue UI, admin dashboard
+  UI (ledger table, payment tracker, wallet balances, overharvest map).
+  Integrates via `GET/POST /api/batches`, `POST /api/qc`, `GET /api/qr`,
+  `GET /api/overharvest-zones` on this backend.
 
 ## Running locally
 
 ```bash
-npm install --legacy-peer-deps   # required: @teachablemachine/image declares an outdated tfjs peer dep
+npm install
 cp .env.example .env.local   # fill in Supabase values, see below
 npm run dev
 ```
@@ -40,17 +44,17 @@ manual actions below.
 
 ```
 src/
-  lib/            — shared utilities: types, Supabase client, hash chain, species classifier
+  lib/            — shared utilities: types, Supabase client, hash chain
   supabase/       — schema.sql (run first) and seed.sql (demo data)
   data/           — demo herb metadata, certificate field mapping, overharvest sample data
   app/
-    collection-center/  — QC queue (Arpan)
-    admin/               — ledger/payment/map dashboard (Arpan)
-    api/                 — batches, qc, qr, certificate, species-classify routes
+    api/          — batches, qc, qr, certificate, species-classify, overharvest-zones routes
 ```
 
-Each folder owned by a teammate has its own `README.md` with the specific
-brief, inputs/outputs, and TODOs — read that before writing code in it.
+No `src/app` pages exist — this is an API-only Next.js app (`layout.tsx`,
+`page.tsx`, `globals.css`, and the Tailwind/PostCSS config were removed once
+the last UI page left this repo; a pages-free Next.js app builds fine
+without them, verified with a real `next build`).
 
 ## What this backend must never claim
 
@@ -68,12 +72,14 @@ brief, inputs/outputs, and TODOs — read that before writing code in it.
 
 1. `src/lib/types.ts` + `src/supabase/schema.sql` — done, block everything else.
 2. `src/lib/hashChain.ts` — done, blocks batch submission and the ledger table.
-3. `src/app/api/batches/route.ts` — **critical path, not yet built**. Blocks
-   the collection-center queue, the admin ledger, certificate generation,
-   and Saanvi's separate frontend repo entirely.
-4. `src/app/api/qc/route.ts` — blocks QR generation and the payment tracker.
-5. `src/data/certificateTemplate.ts` — blocks `src/app/api/certificate/route.ts`.
-6. `src/data/overharvestZones.ts` — no dependencies, safe to build anytime.
+3. `src/app/api/batches/route.ts` — done. Was the critical path; blocked
+   Arpan's collection-center/admin repo, certificate generation, and
+   Saanvi's separate frontend repo.
+4. `src/app/api/qc/route.ts` — still a stub (Arpan's). Blocks QR generation
+   and the payment tracker in his repo.
+5. `src/data/certificateTemplate.ts` — still a stub (Mansi's). Blocks
+   `src/app/api/certificate/route.ts`.
+6. `src/app/api/overharvest-zones/route.ts` — done, no dependencies.
 
 ## Locked API contract — do not re-litigate
 
@@ -84,9 +90,11 @@ This route never accepts or handles raw image bytes. The `harvest-photos`
 bucket needs to be created in Supabase (manual action, alongside project
 creation below).
 
-**CORS**: since Saanvi's repo calls these API routes cross-origin, the API
-routes need CORS headers added for her deployed origin. Not done yet —
-needs to land when `api/batches/route.ts` is built for real.
+**CORS**: since Saanvi's and Arpan's repos both call these API routes
+cross-origin, `api/batches` and `api/overharvest-zones` allow any origin
+(`Access-Control-Allow-Origin: *`) — safe since every response is public,
+non-credentialed data. Apply the same pattern when building `api/qc`,
+`api/qr`, and `api/certificate` for real.
 
 ## ⚠️ Manual actions needed (outside this coding session)
 
@@ -97,12 +105,18 @@ needs to land when `api/batches/route.ts` is built for real.
    `harvest-photos` (Saanvi's repo uploads harvest photos directly here —
    see "Locked API contract" above).
 2. **Train/export the species classifier** — via Teachable Machine (browser
-   tool), export TF.js files into `public/models/` — see that folder's README.
-3. **Source real demo herb photos** — copyright-safe images per species into
-   `public/images/herbs/<slug>/` — see that folder's README.
+   tool). The classifier code and the harvester capture screen that uses it
+   now live in Saanvi's separate repo, so the exported TF.js files
+   (`model.json`, `metadata.json`, `weights.bin`) belong in her repo's
+   `public/models/`, not this one's. This repo's own `public/models/` and
+   `public/images/` folders are likely dead weight now — flagged as a
+   cleanup candidate, not deleted yet.
+3. **Source real demo herb photos** — copyright-safe images per species,
+   handed to Mansi and Saanvi (for `demoHerbs.ts` here and the classifier
+   training set in her repo respectively).
 4. **Deployment** — connect this repo to Vercel (or similar) yourself once
-   the build passes locally. Hand the deployed URL to Saanvi for her API
-   base URL env var.
+   the build passes locally. Hand the deployed URL to Saanvi and Arpan for
+   their API base URL env vars.
 5. **Live device testing** — camera/GPS behavior on a real phone (in
    Saanvi's repo) needs a human on a real device, not verifiable in a
    coding session.

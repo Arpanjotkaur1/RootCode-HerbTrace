@@ -40,8 +40,9 @@ export type OverharvestZone = {
   depletion_score: number; // 0-100, illustrative only -- NOT live satellite data
 };
 
-// Result shape returned by the client-side species classifier
-// (src/lib/species-classifier.ts) before the harvester confirms it.
+// Result shape returned by the client-side species classifier before the
+// harvester confirms it. The classifier itself lives in Saanvi's separate
+// frontend repo (it ran client-side there), not in this backend.
 export type SpeciesClassificationResult = {
   species: string;
   confidence: number; // 0-1
