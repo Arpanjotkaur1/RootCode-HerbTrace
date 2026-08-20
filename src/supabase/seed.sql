@@ -1,0 +1,18 @@
+-- [MANSI] Demo seed data.
+--
+-- What this is for: populates harvesters and overharvest_zones so the app
+-- isn't empty during dev/testing. Run in the Supabase SQL editor after
+-- schema.sql.
+--
+-- Depends on: schema.sql having been run first (Khushi).
+--
+-- Must output/return: INSERT statements for a few demo harvesters and
+-- overharvest zones. Do NOT hand-write batch rows or hashes -- batches must
+-- be created through the real harvester submit flow so the hash chain is
+-- computed correctly.
+--
+-- TODO (Mansi):
+-- 1. Insert 3-4 demo harvesters (name + starting wallet_balance, e.g. 0).
+-- 2. Insert 4-6 overharvest_zones rows -- coordinate with Arpan, who owns
+--    src/data/overharvestZones.ts as the TS source of truth for this data.
+-- 3. Leave `batches` empty here.
