@@ -1,132 +1,157 @@
-# RootCode — HerbTrace (SIH25027 Prototype)
+# HerbTrace
 
-Verifiable, tamper-evident chain of custody for Ayurvedic herbs, from harvest
-to consumer. Built for Smart India Hackathon internal screening.
+**Verifiable, tamper-evident chain of custody for Ayurvedic herbs — from harvest to consumer.**
 
-This repo is a **pure API backend** — a Supabase-backed Next.js app with no
-UI pages at all, only `src/app/api/**` routes (plus `src/lib/species-classifier.ts`,
-a browser-only ML utility that lives here as the canonical source even
-though nothing in this repo imports it — see below). All actual UI
-(harvester capture, consumer/exporter provenance page, Arpan's
-collection-center QC queue and admin dashboard) lives in separate frontend
-repos that integrate with this backend over `fetch` against the deployed
-API routes.
+Built for Smart India Hackathon (SIH25027 — *"Blockchain-based system for botanical traceability of Ayurvedic herbs"*, Ministry of AYUSH) by Team RootCode.
 
-## Team (internal reference only — do not surface this breakdown in any user-facing UI copy)
+**Live API:** `https://rootcode-herbtrace-api.onrender.com`
 
-- **Khushi** — architecture, Supabase schema, hash-chain ledger, AI
-  species-verification integration, cross-module data flow, final
-  integration, deploy reliability.
-- **Saanvi** — separate repo: harvester capture UI, consumer/QR provenance
-  page, design system. Needs her own copy of `species-classifier.ts` from
-  this repo (it's browser-only code, has to physically exist in her app to
-  run) plus the trained model files once they exist. Integrates via the
-  deployed API base URL.
-- **Mansi** — certificate template/field mapping, compliance-oriented data
-  mapping, demo herb/species metadata, research/demo data.
-- **Arpan** — separate repo: collection-center QC queue UI, admin dashboard
-  UI (ledger table, payment tracker, wallet balances, overharvest map).
-  Integrates via `GET/POST /api/batches`, `POST /api/qc`, `GET /api/qr`,
-  `GET /api/overharvest-zones` on this backend.
+---
 
-## Running locally
+## What this is
+
+India's Ayurvedic herb supply chain has no verifiable record connecting a harvested plant to the labeled product a consumer or exporter eventually sees. That gap enables species substitution, undermines export documentation, and lets middlemen control the only payment records that exist — leaving harvesters with no leverage over what they're actually paid.
+
+HerbTrace addresses this with four pillars:
+
+1. **AI species verification at harvest** — the harvester photographs the plant before cutting it; a client-side model returns a species guess and confidence score; GPS and timestamp attach automatically; the harvester confirms before anything is submitted.
+2. **Tamper-evident ledger tied to payment** — each batch is cryptographically chained to the one before it (`SHA-256(batch data + previous hash)`). Passing quality control releases a simulated payment and updates the harvester's wallet balance in the same step.
+3. **Illustrative overharvest monitoring** — a map layer of sample depletion-risk data, explicitly labeled as illustrative, not live satellite ingestion.
+4. **Auto-generated export certificate** — a real PDF built from a batch's actual data, structured around WHO GACP / EU-style traceability fields, without claiming regulatory certification.
+
+## What's real vs. simulated
+
+Said plainly, because hedging on this is worse than stating it:
+
+| Real and live | Simulated / sample data |
+|---|---|
+| The batch API, hash chain, and Postgres database | Payment release and wallet balances (no real money moves) |
+| The species classifier (trained model, real inference) | Overharvest depletion scores (sample data, not satellite feeds) |
+| QC pass/fail, QR generation, certificate PDFs | |
+
+## Architecture
+
+This repo is a **pure API backend** — a Supabase-backed Next.js app with no UI pages. It exists to be the single source of truth that every client (harvester capture app, collection-center dashboard, consumer provenance page) calls into, rather than talking to the database directly.
+
+```
+                    ┌─────────────────────────┐
+  Harvester UI ───▶ │                         │
+  Collection UI ──▶ │   HerbTrace API         │ ───▶  Supabase (Postgres + Storage)
+  Consumer page ──▶ │   (this repo)           │
+                    └─────────────────────────┘
+```
+
+The one exception: harvest photos upload **directly** from the client to Supabase Storage (bucket `harvest-photos`, public) — this API only ever receives the resulting URL, never raw image bytes.
+
+## API reference
+
+Base URL: `https://rootcode-herbtrace-api.onrender.com` — no authentication, CORS open on every route.
+
+| Method & path | What it does |
+|---|---|
+| `GET /api/batches` | List batches — `?id=`, `?qc_status=`, `?harvester_id=` filters |
+| `POST /api/batches` | Submit a harvested batch; computes and stores the hash chain |
+| `POST /api/qc` | Pass/fail a batch; on pass, releases payment and credits the harvester's wallet |
+| `GET /api/qr` | Generate a QR for a batch (only once it has passed QC) |
+| `GET /api/certificate` | Generate the export-compliance PDF for a batch |
+| `GET /api/overharvest-zones` | List illustrative depletion-risk zones |
+| `GET /api/harvesters` | List harvesters and wallet balances |
+| `GET /api/health` | No-op check — hit this to wake the instance before a demo |
+
+Full request/response shapes, required fields, and error codes are documented in each route file's header comment.
+
+### Locked contracts — do not change without team sign-off
+
+- **Photo upload**: client uploads directly to the `harvest-photos` Supabase Storage bucket and sends only the resulting `photo_url` string to `POST /api/batches`. This API never accepts image bytes.
+- **`quantity_kg` is required** on `POST /api/batches` — it's the basis for the QC payment calculation (`quantity_kg × ₹50/kg`, hardcoded rate).
+- **Species names** must exactly match across `species_claimed`, `species_ai_result`, and the classifier's output classes: `Ashwagandha`, `Brahmi`, `Tulsi`, `Neem`, `Lookalike (non-medicinal)`.
+- The hash chain is **never** referred to as "blockchain" in any user-facing copy.
+- The overharvest map must carry the label *"Illustrative Sample Data — Not Live Satellite Ingestion"* wherever it's shown.
+
+## Getting started
 
 ```bash
+git clone https://github.com/Arpanjotkaur1/RootCode-HerbTrace.git
+cd RootCode-HerbTrace
 npm install --legacy-peer-deps   # required: @teachablemachine/image declares an outdated tfjs peer dep
-cp .env.example .env.local   # fill in Supabase values, see below
+cp .env.example .env.local       # fill in your Supabase project values
 npm run dev
 ```
 
-## Environment setup
+### Environment variables
 
-See [.env.example](.env.example) for the required Supabase values
-(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY`). These come from a Supabase project — see
-manual actions below.
+See [`.env.example`](.env.example):
 
-## Repo structure
+| Variable | Where to find it |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase dashboard → Project Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Same page, "anon public" |
+| `SUPABASE_SERVICE_ROLE_KEY` | Same page, "service_role" — **server-side only, never expose to a client** |
+
+### Database setup
+
+Run [`src/supabase/schema.sql`](src/supabase/schema.sql) in the Supabase SQL Editor, then [`src/supabase/seed.sql`](src/supabase/seed.sql) for demo data. Also create a **public** Storage bucket named exactly `harvest-photos`, with RLS policies allowing `anon` to `INSERT` and `SELECT` on it (see `schema.sql` for the reference policies used on the tables — Storage policies are configured separately in the Storage section of the dashboard or via SQL against `storage.objects`).
+
+## Project structure
 
 ```
 src/
-  lib/            — shared utilities: types, Supabase client, hash chain,
-                    species classifier (browser-only, unused within this repo)
-  supabase/       — schema.sql (run first) and seed.sql (demo data)
-  data/           — demo herb metadata, certificate field mapping, overharvest sample data
-  app/
-    api/          — batches, qc, qr, certificate, overharvest-zones routes
+  lib/            shared utilities — types, Supabase client, hash chain,
+                   and the species classifier (canonical source; the
+                   classifier itself runs client-side in the harvester app,
+                   not in this repo)
+  supabase/       schema.sql and seed.sql
+  data/           demo herb metadata, certificate field mapping,
+                   overharvest sample data
+  app/api/        the seven routes listed above — the entire surface of
+                   this app; there are no UI pages
 ```
 
-No `src/app` pages exist — this is an API-only Next.js app (`layout.tsx`,
-`page.tsx`, `globals.css`, and the Tailwind/PostCSS config were removed once
-the last UI page left this repo; a pages-free Next.js app builds fine
-without them, verified with a real `next build`).
+## Data model
 
-## What this backend must never claim
+```ts
+type Batch = {
+  id: string;
+  species_claimed: string;
+  species_ai_result: string;
+  confidence_score: number;        // 0–1
+  gps_lat: number;
+  gps_lon: number;
+  harvester_id: string;
+  photo_url: string;
+  timestamp: string;                // ISO 8601
+  quantity_kg: number;
+  qc_status: "pending" | "pass" | "fail";
+  qc_notes: string | null;
+  qc_timestamp: string | null;
+  prev_hash: string | null;
+  hash: string;
+  payment_status: "pending" | "released";
+  payment_amount: number | null;
+};
 
-- Do not call the hash chain a "blockchain" anywhere in UI copy — it's
-  server-side SHA-256 chaining stored in Postgres, not a deployed chain.
-- Any simulated action (payment release, overharvest depletion data) must
-  say so explicitly in UI copy.
-- The certificate PDF is structured around WHO GACP / EU-style traceability
-  fields but does not grant real regulatory certification — say so in the
-  PDF itself.
-- The overharvest map must be labeled "Illustrative Sample Data — Not Live
-  Satellite Ingestion" near the map.
+type Harvester = { id: string; name: string; wallet_balance: number };
 
-## Dependency order
+type OverharvestZone = { id: string; region: string; lat: number; lon: number; depletion_score: number };
+```
 
-1. `src/lib/types.ts` + `src/supabase/schema.sql` — done, block everything else.
-2. `src/lib/hashChain.ts` — done, blocks batch submission and the ledger table.
-3. `src/app/api/batches/route.ts` — done. Was the critical path; blocked
-   Arpan's collection-center/admin repo, certificate generation, and
-   Saanvi's separate frontend repo.
-4. `src/app/api/qc/route.ts` — still a stub (Arpan's). Blocks QR generation
-   and the payment tracker in his repo.
-5. `src/data/certificateTemplate.ts` — still a stub (Mansi's). Blocks
-   `src/app/api/certificate/route.ts`.
-6. `src/app/api/overharvest-zones/route.ts` — done, no dependencies.
+## Team & related repos
 
-## Locked API contract — do not re-litigate
+RootCode is four people; this repo is the shared backend all client apps integrate against.
 
-**Photo upload**: Saanvi's frontend uploads the harvest photo directly to a
-public Supabase Storage bucket named `harvest-photos`, then sends the
-resulting `photo_url` (plain string) in the JSON body of `POST /api/batches`.
-This route never accepts or handles raw image bytes. The `harvest-photos`
-bucket needs to be created in Supabase (manual action, alongside project
-creation below).
+| Person | Owns | Repo |
+|---|---|---|
+| Khushi | Architecture, schema, hash chain, deployment, cross-module integration | this repo |
+| Arpan | Collection-center QC queue, payment logic, admin dashboard, QR generation | separate frontend repo |
+| Saanvi | Harvester capture UI, species classifier integration, consumer/QR provenance page | [`saanvi-006/rootcode-trace`](https://github.com/saanvi-006/rootcode-trace) |
+| Mansi | Certificate template, compliance field mapping, demo herb metadata | this repo (`src/data/`, `src/app/api/certificate/`) |
 
-**CORS**: since Saanvi's and Arpan's repos both call these API routes
-cross-origin, `api/batches` and `api/overharvest-zones` allow any origin
-(`Access-Control-Allow-Origin: *`) — safe since every response is public,
-non-credentialed data. Apply the same pattern when building `api/qc`,
-`api/qr`, and `api/certificate` for real.
+## Deployment
 
-## ⚠️ Manual actions needed (outside this coding session)
+Hosted on Render (free tier). The build command is `npm install --legacy-peer-deps && npm run build`; the start command is `next start -p $PORT`. Free-tier instances sleep after ~15 minutes of inactivity and take 30–50s to wake on the next request — hit `GET /api/health` a few minutes before any live demo to avoid that delay in front of an audience.
 
-1. **Create the Supabase project** — sign up at supabase.com, create a
-   project, paste the URL/anon key/service key into `.env.local`. Then run
-   `src/supabase/schema.sql` in the SQL editor, followed by `seed.sql` once
-   Mansi fills it in. Also create a public Storage bucket named
-   `harvest-photos` (Saanvi's repo uploads harvest photos directly here —
-   see "Locked API contract" above).
-2. **Train/export the species classifier** — via Teachable Machine (browser
-   tool). Classifier code lives here (`src/lib/species-classifier.ts`) as
-   the canonical source, but the exported TF.js files (`model.json`,
-   `metadata.json`, `weights.bin`) need to go wherever the classifier
-   actually runs -- Saanvi's repo, since it's client-side code loaded by the
-   harvester capture screen. This repo has no `public/models/` to put them
-   in either. See step-by-step in the classifier's file header comment.
-3. **Source real demo herb photos** — copyright-safe images per species,
-   handed to Mansi (for `demoHerbs.ts` reference data) and Saanvi (for the
-   classifier's training set in her repo). This repo has no `public/images/`
-   to put them in — Mansi's `image_paths` field in `demoHerbs.ts` should
-   point wherever the images actually end up hosted (e.g. Supabase Storage),
-   not a local path in this repo.
-4. **Deployment** — connect this repo to Vercel (or similar) yourself once
-   the build passes locally. Hand the deployed URL to Saanvi and Arpan for
-   their API base URL env vars.
-5. **Live device testing** — camera/GPS behavior on a real phone (in
-   Saanvi's repo) needs a human on a real device, not verifiable in a
-   coding session.
-6. **Final live QR code** — only possible once the frontend is deployed;
-   this is a final-day task, not something to fake with a localhost link.
+## Known limitations
+
+- Live camera/GPS behavior has only been verified through the API layer, not on a physical device in the field.
+- The batches table's hash-chain lookup (find the most recent batch, then insert) is not race-safe under concurrent submissions — acceptable for a single-demo prototype, would need a database-level lock or transaction for production use.
+- The overharvest layer is explicitly sample data; a production version would need a real satellite/NDVI data source.
