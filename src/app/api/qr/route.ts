@@ -88,9 +88,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 3. Resolve frontend base URL & provenance URL (exact Mansi pattern in api/certificate/route.ts)
+    // 3. Resolve frontend base URL & provenance URL
     const frontendBaseUrl =
-      process.env.NEXT_PUBLIC_FRONTEND_URL || "https://herbtrace.rootcode.dev";
+      process.env.FRONTEND_BASE_URL ||
+      process.env.NEXT_PUBLIC_FRONTEND_URL ||
+      "http://localhost:8080";
     const provenanceUrl = `${frontendBaseUrl}/provenance/${batch.id}`;
 
     // 3. Format determination: PNG binary vs base64 data URL

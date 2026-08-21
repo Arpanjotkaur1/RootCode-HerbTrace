@@ -526,7 +526,9 @@ export async function GET(request: NextRequest) {
 
     // 3. Generate QR code
     const frontendBaseUrl =
-      process.env.NEXT_PUBLIC_FRONTEND_URL || "https://herbtrace.rootcode.dev";
+      process.env.FRONTEND_BASE_URL ||
+      process.env.NEXT_PUBLIC_FRONTEND_URL ||
+      "http://localhost:8080";
     const provenanceUrl = `${frontendBaseUrl}/provenance/${batch.id}`;
 
     const qrDataUrl = await QRCode.toDataURL(provenanceUrl, {
