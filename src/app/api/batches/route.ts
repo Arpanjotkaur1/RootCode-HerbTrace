@@ -79,6 +79,7 @@ type CreateBatchBody = {
   gps_lon: number;
   harvester_id: string;
   photo_url: string;
+  quantity_kg: number;
   timestamp?: string;
 };
 
@@ -90,6 +91,7 @@ const REQUIRED_FIELDS: (keyof CreateBatchBody)[] = [
   "gps_lon",
   "harvester_id",
   "photo_url",
+  "quantity_kg",
 ];
 
 // POST /api/batches -- harvester submits a confirmed capture.
@@ -156,6 +158,7 @@ export async function POST(request: NextRequest) {
       harvester_id: chainable.harvester_id,
       photo_url: chainable.photo_url,
       timestamp,
+      quantity_kg: body.quantity_kg,
       qc_status: "pending",
       prev_hash: prevHash,
       hash,

@@ -24,6 +24,7 @@ export type Batch = {
   hash: string; // SHA256(canonical_batch_data + prev_hash)
   payment_status: PaymentStatus;
   payment_amount: number | null; // set on payment release
+  quantity_kg: number; // harvested weight in kg, defaults to 0 in the DB -- POST /api/batches doesn't currently accept/set this
 };
 
 export type Harvester = {
