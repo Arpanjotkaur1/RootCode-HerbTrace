@@ -524,11 +524,13 @@ export async function GET(request: NextRequest) {
       generated_at: new Date().toISOString(),
     };
 
-    // 3. Generate QR code
-    // Falls back to the live deployed frontend since NEXT_PUBLIC_FRONTEND_URL
-    // is not set on Render -- update both if that ever changes.
+    // 3. Generate QR code.
+    // FRONTEND_BASE_URL lets Render/local overrides work; falls back to the
+    // real live deployed frontend, NOT localhost -- a localhost fallback
+    // would make every QR/certificate unusable for anyone but the person
+    // running that exact machine, which defeats the point of a QR code.
     const frontendBaseUrl =
-      process.env.NEXT_PUBLIC_FRONTEND_URL || "https://rootcode-trace.vercel.app";
+      process.env.FRONTEND_BASE_URL || "https://rootcode-trace.vercel.app";
     const provenanceUrl = `${frontendBaseUrl}/trace/${batch.id}`;
 
     const qrDataUrl = await QRCode.toDataURL(provenanceUrl, {
