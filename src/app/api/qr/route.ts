@@ -11,7 +11,8 @@
 //   something to fake here with localhost).
 //
 // Must output/return: GET ?batchId=... returns a QR code (data URL or PNG)
-// encoding {frontendBaseUrl}/provenance/{batchId}.
+// encoding {frontendBaseUrl}/trace/{batchId} -- matches Saanvi's live route
+// (src/routes/trace.$batchId.tsx in her repo).
 
 import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
@@ -89,9 +90,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. Resolve frontend base URL & provenance URL (exact Mansi pattern in api/certificate/route.ts)
+    // Falls back to the live deployed frontend since NEXT_PUBLIC_FRONTEND_URL
+    // is not set on Render -- update both if that ever changes.
     const frontendBaseUrl =
-      process.env.NEXT_PUBLIC_FRONTEND_URL || "https://herbtrace.rootcode.dev";
-    const provenanceUrl = `${frontendBaseUrl}/provenance/${batch.id}`;
+      process.env.NEXT_PUBLIC_FRONTEND_URL || "https://rootcode-trace.vercel.app";
+    const provenanceUrl = `${frontendBaseUrl}/trace/${batch.id}`;
 
     // 3. Format determination: PNG binary vs base64 data URL
     const format = searchParams.get("format")?.toLowerCase();

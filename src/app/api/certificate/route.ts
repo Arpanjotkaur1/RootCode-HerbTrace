@@ -525,9 +525,11 @@ export async function GET(request: NextRequest) {
     };
 
     // 3. Generate QR code
+    // Falls back to the live deployed frontend since NEXT_PUBLIC_FRONTEND_URL
+    // is not set on Render -- update both if that ever changes.
     const frontendBaseUrl =
-      process.env.NEXT_PUBLIC_FRONTEND_URL || "https://herbtrace.rootcode.dev";
-    const provenanceUrl = `${frontendBaseUrl}/provenance/${batch.id}`;
+      process.env.NEXT_PUBLIC_FRONTEND_URL || "https://rootcode-trace.vercel.app";
+    const provenanceUrl = `${frontendBaseUrl}/trace/${batch.id}`;
 
     const qrDataUrl = await QRCode.toDataURL(provenanceUrl, {
       margin: 1,
