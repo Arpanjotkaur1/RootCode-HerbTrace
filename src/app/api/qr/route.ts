@@ -12,15 +12,130 @@
 //
 // Must output/return: GET ?batchId=... returns a QR code (data URL or PNG)
 // encoding {frontendBaseUrl}/provenance/{batchId}.
-//
-// TODO (Arpan):
-// 1. Look up the batch to confirm it exists (and optionally that qc_status === "pass").
-// 2. Generate the QR code with the `qrcode` package.
-// 3. Decide data URL vs. downloadable PNG based on how the admin/collection-center UI wants to use it.
+
+import { NextRequest, NextResponse } from "next/server";
+import QRCode from "qrcode";
+import { getServiceSupabase } from "@/lib/supabase";
 
 // force-dynamic: not logic, just tells Next.js not to prerender this GET
-// route at build time (it will need live DB reads once implemented, and an
-// empty stub body otherwise fails `next build`'s static export step).
+// route at build time (it needs live DB reads and live env vars).
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {}
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+function json(data: unknown, init?: ResponseInit) {
+  return NextResponse.json(data, {
+    ...init,
+    headers: { ...CORS_HEADERS, ...(init?.headers ?? {}) },
+  });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+// GET /api/qr?batchId=...
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const batchId =
+      searchParams.get("batchId") ||
+      searchParams.get("id") ||
+      searchParams.get("batch_id");
+
+    if (!batchId || typeof batchId !== "string" || batchId.trim() === "") {
+      return json(
+        { error: "missing or invalid required field: batchId" },
+        { status: 400 }
+      );
+    }
+
+    const normalizedBatchId = batchId.trim();
+    const supabase = getServiceSupabase();
+
+    // 1. Look up batch
+    const { data: batch, error: batchError } = await supabase
+      .from("batches")
+      .select("*")
+      .eq("id", normalizedBatchId)
+      .maybeSingle();
+
+    if (batchError) {
+      return json(
+        { error: `database error: ${batchError.message}` },
+        { status: 500 }
+      );
+    }
+
+    if (!batch) {
+      return json(
+        { error: `batch not found for ID: ${normalizedBatchId}` },
+        { status: 404 }
+      );
+    }
+
+    // 2. QC status check: only generate QR if batch has passed QC
+    if (batch.qc_status !== "pass") {
+      return json(
+        {
+          error: `QR unavailable: batch has not passed QC (status: ${batch.qc_status})`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 3. Resolve frontend base URL & provenance URL (exact Mansi pattern in api/certificate/route.ts)
+    const frontendBaseUrl =
+      process.env.NEXT_PUBLIC_FRONTEND_URL || "https://herbtrace.rootcode.dev";
+    const provenanceUrl = `${frontendBaseUrl}/provenance/${batch.id}`;
+
+    // 3. Format determination: PNG binary vs base64 data URL
+    const format = searchParams.get("format")?.toLowerCase();
+    const acceptHeader = request.headers.get("accept") || "";
+
+    if (format === "png" || acceptHeader.includes("image/png")) {
+      const pngBuffer = await QRCode.toBuffer(provenanceUrl, {
+        margin: 1,
+        width: 300,
+        color: {
+          dark: "#1b4332",
+          light: "#ffffff",
+        },
+      });
+
+      return new NextResponse(new Uint8Array(pngBuffer), {
+        status: 200,
+        headers: {
+          ...CORS_HEADERS,
+          "Content-Type": "image/png",
+          "Content-Disposition": `inline; filename="HerbTrace-QR-${batch.id.slice(0, 8)}.png"`,
+        },
+      });
+    }
+
+    // Default: Return base64 PNG data URL in JSON
+    const qrDataUrl = await QRCode.toDataURL(provenanceUrl, {
+      margin: 1,
+      width: 300,
+      color: {
+        dark: "#1b4332",
+        light: "#ffffff",
+      },
+    });
+
+    return json({
+      qr: qrDataUrl,
+      qr_data_url: qrDataUrl,
+      provenance_url: provenanceUrl,
+      batch_id: batch.id,
+    });
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : "Failed to generate QR code";
+    return json({ error: message }, { status: 500 });
+  }
+}
